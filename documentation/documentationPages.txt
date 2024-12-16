@@ -1,0 +1,3172 @@
+// src/App.jsx
+import React from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import Nav from "./components/Nav";
+
+// Importar páginas existentes
+import Home from "./pages/Home";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import Enfermedades from "./pages/Enfermedades";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Welcome from "./pages/Welcome";
+import Mapa from "./pages/Mapa";
+import Monitoreo from "./pages/Monitoreo";
+import Shop from "./pages/Shop";
+import Cart from "./pages/Cart";
+import Buy from "./pages/Buy";
+import ProductDetails from "./pages/ProductDetails";
+import FAQ from "./pages/FAQ"; // Importar la nueva página
+
+// Importar el CartProvider
+import { CartProvider } from "./context/CartContext";
+
+function App() {
+  return (
+    <CartProvider>
+      <Router>
+        <Nav />
+        <Routes>
+          <Route path="/" element={<Welcome />} />
+          <Route path="/welcome" element={<Welcome />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/registrodevacas" element={<About />} />
+          <Route path="/mapa" element={<Mapa />} />
+          <Route path="/monitoreo" element={<Monitoreo />} />
+          <Route path="/enfermedades" element={<Enfermedades />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/shop" element={<Shop />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/buy" element={<Buy />} />
+          <Route path="/product/:id" element={<ProductDetails />} />
+          <Route path="/faq" element={<FAQ />} /> {/* Nueva ruta */}
+          <Route path="*" element={<Navigate to="/welcome" />} />
+        </Routes>
+      </Router>
+    </CartProvider>
+  );
+}
+
+export default App;
+
+// src/components/Nav.jsx
+import React, { useContext } from "react";
+import { Link } from "react-router-dom";
+import { CartContext } from "../context/CartContext";
+import { FaShoppingCart } from "react-icons/fa";
+
+function Nav() {
+  const { totalItems } = useContext(CartContext);
+
+  return (
+    <nav className="bg-green-700 text-white p-4 shadow-md">
+      <div className="container mx-auto flex justify-between items-center">
+        <Link to="/welcome" className="text-2xl font-bold">
+          Agrotrack
+        </Link>
+        <div className="flex space-x-4">
+          <Link to="/home" className="hover:text-gray-200">
+            Home
+          </Link>
+          <Link to="/shop" className="hover:text-gray-200">
+            Tienda
+          </Link>
+          <Link to="/faq" className="hover:text-gray-200">
+            FAQ
+          </Link>{" "}
+          {/* Enlace a la página de FAQ */}
+          <Link to="/about" className="hover:text-gray-200">
+            Acerca de
+          </Link>
+          <Link to="/contact" className="hover:text-gray-200">
+            Contacto
+          </Link>
+          <Link to="/cart" className="relative hover:text-gray-200">
+            <FaShoppingCart size={24} />
+            {totalItems > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-600 text-xs rounded-full px-1">
+                {totalItems}
+              </span>
+            )}
+          </Link>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+export default Nav;
+
+// src/components/ProtectedRoute.jsx
+import React from "react";
+// Puedes comentar el contenido para deshabilitarlo temporalmente
+
+const ProtectedRoute = ({ children }) => {
+  // Temporalmente permitir el acceso sin verificar autenticación
+  return children;
+};
+
+export default ProtectedRoute;
+
+// src/context/AuthContext.jsx
+import React, { createContext, useState, useEffect } from "react";
+import { supabase } from "../client";
+
+export const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [ganadero, setGanadero] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Obtener la sesión inicial al montar el componente
+  useEffect(() => {
+    const fetchSession = async () => {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Error fetching session:", error);
+        setLoading(false);
+        return;
+      }
+
+      if (session?.user) {
+        setGanadero(session.user);
+      } else {
+        setGanadero(null);
+      }
+      setLoading(false);
+    };
+
+    fetchSession();
+  }, []);
+
+  // Escuchar cambios en el estado de autenticación
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session?.user) {
+          setGanadero(session.user);
+        } else {
+          setGanadero(null);
+        }
+      }
+    );
+
+    // Limpiar la suscripción al desmontar el componente
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // Función de login usando Supabase Auth
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw error;
+    return data; // Retorna los datos para su uso posterior
+  };
+
+  // Función de signup usando Supabase Auth
+  const signup = async (email, password) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    if (error) throw error;
+    return data; // Retorna los datos para su uso posterior
+  };
+
+  // Función de logout usando Supabase Auth
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) console.error("Error signing out:", error);
+    setGanadero(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ ganadero, login, logout, signup, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// src/context/CartContext.jsx
+import React, { createContext, useState } from "react";
+
+export const CartContext = createContext();
+
+export function CartProvider({ children }) {
+  const [cartItems, setCartItems] = useState([]);
+
+  const addToCart = (product) => {
+    setCartItems((prevItems) => {
+      const existingIndex = prevItems.findIndex(
+        (item) => item.id === product.id
+      );
+      if (existingIndex > -1) {
+        const updatedItems = [...prevItems];
+        updatedItems[existingIndex].quantity += 1;
+        return updatedItems;
+      } else {
+        return [...prevItems, { ...product, quantity: 1 }];
+      }
+    });
+  };
+
+  const removeFromCart = (productId) => {
+    setCartItems((prevItems) =>
+      prevItems.filter((item) => item.id !== productId)
+    );
+  };
+
+  const updateQuantity = (productId, quantity) => {
+    if (quantity < 1) return;
+    setCartItems((prevItems) => {
+      const updatedItems = [...prevItems];
+      const itemIndex = updatedItems.findIndex((item) => item.id === productId);
+      if (itemIndex > -1) {
+        updatedItems[itemIndex].quantity = quantity;
+      }
+      return updatedItems;
+    });
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = cartItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+
+  return (
+    <CartContext.Provider
+      value={{
+        cartItems,
+        addToCart,
+        removeFromCart,
+        updateQuantity,
+        clearCart,
+        totalItems,
+        totalPrice,
+      }}
+    >
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+// src/main.jsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import "./index.css"; // Asegúrate de que este archivo exista
+import App from "./App.jsx";
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+// src/pages/About.jsx
+
+import { useState, useEffect } from "react";
+import { supabase } from "../client";
+
+function About() {
+  const [animals, setAnimals] = useState([]);
+  const [newAnimal, setNewAnimal] = useState({
+    name: "",
+    species: "",
+    breed: "",
+    age: "",
+    weight: "",
+    location: "",
+    latitude: "",
+    longitude: "",
+    group_name: "",
+    mother_id: "",
+    father_id: "",
+  });
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Valor fijo para ganadero_id
+  const ganadero_id = "default-ganadero-id"; // Reemplaza esto con el ID deseado
+
+  // Función para obtener la lista de animales del ganadero
+  const fetchAnimals = async () => {
+    const { data, error } = await supabase
+      .from("animals")
+      .select("*")
+      .eq("ganadero_id", ganadero_id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching animals:", error);
+      setError("Error al obtener los animales.");
+    } else {
+      setAnimals(data);
+    }
+  };
+
+  // Cargar la lista de animales al montar el componente
+  useEffect(() => {
+    fetchAnimals();
+  }, []);
+
+  // Función para manejar el envío del formulario
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    // Validar las coordenadas
+    const latitude = parseFloat(newAnimal.latitude);
+    const longitude = parseFloat(newAnimal.longitude);
+
+    if (
+      isNaN(latitude) ||
+      isNaN(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      setError("Por favor, ingresa coordenadas válidas para la ubicación.");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("animals").insert([
+        {
+          ganadero_id: ganadero_id, // Usar el valor fijo
+          name: newAnimal.name,
+          species: newAnimal.species,
+          breed: newAnimal.breed || null,
+          age: newAnimal.age ? parseInt(newAnimal.age) : null,
+          weight: newAnimal.weight ? parseFloat(newAnimal.weight) : null,
+          location: newAnimal.location || null,
+          latitude: latitude,
+          longitude: longitude,
+          group_name: newAnimal.group_name || null,
+          mother_id: newAnimal.mother_id || null,
+          father_id: newAnimal.father_id || null,
+        },
+      ]);
+
+      if (error) {
+        console.error("Error inserting animal:", error);
+        setError("Error al agregar el animal.");
+      } else {
+        // Limpiar el formulario y actualizar la lista
+        setNewAnimal({
+          name: "",
+          species: "",
+          breed: "",
+          age: "",
+          weight: "",
+          location: "",
+          latitude: "",
+          longitude: "",
+          group_name: "",
+          mother_id: "",
+          father_id: "",
+        });
+        fetchAnimals();
+        setSuccess("Animal agregado exitosamente.");
+      }
+    } catch (err) {
+      setError("Error al agregar el animal.");
+      console.error(err);
+    }
+  };
+
+  // Función para manejar cambios en el formulario
+  const handleChange = (e) => {
+    setNewAnimal({ ...newAnimal, [e.target.name]: e.target.value });
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Registro de Animales</h1>
+
+      {/* Formulario para agregar un nuevo animal */}
+      <form onSubmit={handleSubmit} className="mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Campos existentes */}
+          <input
+            type="text"
+            name="name"
+            placeholder="Nombre"
+            value={newAnimal.name}
+            onChange={handleChange}
+            required
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="species"
+            placeholder="Especie"
+            value={newAnimal.species}
+            onChange={handleChange}
+            required
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="breed"
+            placeholder="Raza"
+            value={newAnimal.breed}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="number"
+            name="age"
+            placeholder="Edad"
+            value={newAnimal.age}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="number"
+            step="0.01"
+            name="weight"
+            placeholder="Peso (kg)"
+            value={newAnimal.weight}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="text"
+            name="location"
+            placeholder="Ubicación"
+            value={newAnimal.location}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="number"
+            step="0.0001"
+            name="latitude"
+            placeholder="Latitud"
+            value={newAnimal.latitude}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+          <input
+            type="number"
+            step="0.0001"
+            name="longitude"
+            placeholder="Longitud"
+            value={newAnimal.longitude}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+
+          {/* Nuevo campo para el grupo */}
+          <input
+            type="text"
+            name="group_name"
+            placeholder="Grupo"
+            value={newAnimal.group_name}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+
+          {/* Campos para seleccionar los padres */}
+          <select
+            name="mother_id"
+            value={newAnimal.mother_id}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          >
+            <option value="">Selecciona la Madre</option>
+            {animals.map((animal) => (
+              <option key={animal.id} value={animal.id}>
+                {animal.name} (ID: {animal.id})
+              </option>
+            ))}
+          </select>
+
+          <select
+            name="father_id"
+            value={newAnimal.father_id}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          >
+            <option value="">Selecciona el Padre</option>
+            {animals.map((animal) => (
+              <option key={animal.id} value={animal.id}>
+                {animal.name} (ID: {animal.id})
+              </option>
+            ))}
+          </select>
+        </div>
+        {error && <p className="text-red-600 mt-2">{error}</p>}
+        {success && <p className="text-green-600 mt-2">{success}</p>}
+        <button
+          type="submit"
+          className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Agregar Animal
+        </button>
+      </form>
+
+      {/* Lista de animales */}
+      <h2 className="text-xl font-semibold mb-4">Animales Registrados</h2>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white border">
+          <thead>
+            <tr>
+              <th className="py-2 px-4 border-b">Nombre</th>
+              <th className="py-2 px-4 border-b">Especie</th>
+              <th className="py-2 px-4 border-b">Raza</th>
+              <th className="py-2 px-4 border-b">Edad</th>
+              <th className="py-2 px-4 border-b">Peso (kg)</th>
+              <th className="py-2 px-4 border-b">Ubicación</th>
+              <th className="py-2 px-4 border-b">Grupo</th>
+              <th className="py-2 px-4 border-b">Fecha de Registro</th>
+            </tr>
+          </thead>
+          <tbody>
+            {animals.length === 0 ? (
+              <tr>
+                <td colSpan="8" className="py-2 px-4 text-center">
+                  No hay animales registrados.
+                </td>
+              </tr>
+            ) : (
+              animals.map((animal) => (
+                <tr key={animal.id}>
+                  <td className="py-2 px-4 border-b">{animal.name}</td>
+                  <td className="py-2 px-4 border-b">{animal.species}</td>
+                  <td className="py-2 px-4 border-b">
+                    {animal.breed || "N/A"}
+                  </td>
+                  <td className="py-2 px-4 border-b">{animal.age || "N/A"}</td>
+                  <td className="py-2 px-4 border-b">
+                    {animal.weight || "N/A"}
+                  </td>
+                  <td className="py-2 px-4 border-b">
+                    {animal.location || "N/A"}
+                  </td>
+                  <td className="py-2 px-4 border-b">
+                    {animal.group_name || "N/A"}
+                  </td>
+                  <td className="py-2 px-4 border-b">
+                    {new Date(animal.created_at).toLocaleString()}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export default About;
+
+// src/pages/Buy.jsx
+import React, { useContext, useState } from "react";
+import { CartContext } from "../context/CartContext";
+import { Link } from "react-router-dom";
+
+function Buy() {
+  const { cartItems, totalPrice, clearCart } = useContext(CartContext);
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleCheckout = (e) => {
+    e.preventDefault();
+    // Aquí puedes integrar con tu backend o Supabase
+    clearCart();
+    setSubmitted(true);
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(amount);
+  };
+
+  if (submitted) {
+    return (
+      <div className="container mx-auto p-4 flex flex-col items-center">
+        <h1 className="text-3xl font-bold mb-6 text-center text-green-700">
+          Gracias por tu compra
+        </h1>
+        <p className="text-center">Nos pondremos en contacto contigo pronto.</p>
+        <Link
+          to="/shop"
+          className="mt-6 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
+        >
+          Volver a la Tienda
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-4 flex flex-col md:flex-row gap-6">
+      <div className="w-full md:w-1/2">
+        <h1 className="text-3xl font-bold mb-6 text-center text-green-700">
+          Finalizar Compra / Contactar
+        </h1>
+        {cartItems.length > 0 && (
+          <div className="mb-6 border p-4 rounded bg-white shadow">
+            <h2 className="text-xl font-semibold mb-2">Tu Pedido</h2>
+            {cartItems.map((item) => (
+              <p key={item.id} className="flex justify-between">
+                <span>
+                  {item.name} x {item.quantity}
+                </span>
+                <span>{formatCurrency(item.quantity * item.price)}</span>
+              </p>
+            ))}
+            <p className="mt-4 font-bold text-lg text-right">
+              Total: {formatCurrency(totalPrice)}
+            </p>
+          </div>
+        )}
+
+        <form onSubmit={handleCheckout} className="bg-white rounded shadow p-6">
+          <div className="mb-4">
+            <label className="block font-semibold mb-1">Nombre</label>
+            <input
+              type="text"
+              className="border w-full p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Tu nombre completo"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block font-semibold mb-1">Dirección</label>
+            <input
+              type="text"
+              className="border w-full p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Tu dirección"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block font-semibold mb-1">
+              Mensaje o Solicitud
+            </label>
+            <textarea
+              className="border w-full p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Opcional: Dinos más acerca de tu solicitud"
+              rows="4"
+            ></textarea>
+          </div>
+          <button className="bg-green-600 text-white w-full py-2 rounded hover:bg-green-700 transition">
+            Enviar Pedido/Contacto
+          </button>
+        </form>
+      </div>
+      <div className="w-full md:w-1/2 flex flex-col items-center">
+        {/* Puedes agregar una imagen o contenido adicional aquí */}
+        <img
+          src="/checkout.png" // Asegúrate de que esta imagen exista en la carpeta public
+          alt="Checkout"
+          className="w-full h-auto max-w-md"
+        />
+      </div>
+    </div>
+  );
+}
+
+export default Buy;
+
+// src/pages/Cart.jsx
+import React, { useContext } from "react";
+import { CartContext } from "../context/CartContext";
+import { Link } from "react-router-dom";
+import { FaTrash } from "react-icons/fa";
+
+function Cart() {
+  const { cartItems, removeFromCart, updateQuantity, totalPrice, clearCart } =
+    useContext(CartContext);
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(amount);
+  };
+
+  if (cartItems.length === 0) {
+    return (
+      <div className="container mx-auto p-4">
+        <h1 className="text-3xl font-bold mb-6 text-center text-green-700">
+          Carrito de Compras
+        </h1>
+        <p className="text-center">El carrito está vacío.</p>
+        <div className="text-center mt-4">
+          <Link
+            to="/shop"
+            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
+          >
+            Volver a la Tienda
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6 text-center text-green-700">
+        Carrito de Compras
+      </h1>
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+          <thead className="bg-gray-200">
+            <tr>
+              <th className="py-3 px-4 text-left">Producto</th>
+              <th className="py-3 px-4 text-left">Precio</th>
+              <th className="py-3 px-4 text-left">Cantidad</th>
+              <th className="py-3 px-4 text-left">Total</th>
+              <th className="py-3 px-4 text-left">Eliminar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cartItems.map((item) => (
+              <tr key={item.id} className="border-b hover:bg-gray-50">
+                <td className="py-3 px-4">{item.name}</td>
+                <td className="py-3 px-4">{formatCurrency(item.price)}</td>
+                <td className="py-3 px-4">
+                  <input
+                    type="number"
+                    min="1"
+                    value={item.quantity}
+                    onChange={(e) =>
+                      updateQuantity(item.id, parseInt(e.target.value))
+                    }
+                    className="w-16 border border-gray-300 rounded p-1 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </td>
+                <td className="py-3 px-4">
+                  {formatCurrency(item.quantity * item.price)}
+                </td>
+                <td className="py-3 px-4">
+                  <button
+                    onClick={() => removeFromCart(item.id)}
+                    className="text-red-600 hover:text-red-800 font-semibold flex items-center"
+                  >
+                    <FaTrash className="mr-1" /> Eliminar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-col md:flex-row justify-between items-center mt-4">
+        <p className="text-xl font-semibold mb-4 md:mb-0">
+          Total: {formatCurrency(totalPrice)}
+        </p>
+        <div className="flex space-x-4">
+          <button
+            onClick={clearCart}
+            className="bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 transition flex items-center"
+          >
+            Vaciar Carrito
+          </button>
+          <Link
+            to="/buy"
+            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition flex items-center"
+          >
+            Proceder a Comprar
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Cart;
+
+// src/pages/Contact.jsx
+import { supabase } from "../client";
+import { useState, useEffect, useContext } from "react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import { AuthContext } from "../context/AuthContext";
+
+function Contact() {
+  const { ganadero } = useContext(AuthContext);
+  const [locations, setLocations] = useState([]);
+
+  useEffect(() => {
+    // Supongamos que tienes una API que devuelve las ubicaciones de las vacas del ganadero
+    // Por ejemplo, podrías crear un endpoint en Supabase Functions o en tu backend
+    const fetchLocations = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("animals")
+          .select("name, location, latitude, longitude")
+          .eq("ganadero_id", ganadero.id);
+
+        if (error) {
+          console.error("Error fetching locations:", error);
+        } else {
+          setLocations(data);
+        }
+      } catch (err) {
+        console.error("Error fetching locations:", err);
+      }
+    };
+
+    if (ganadero) {
+      fetchLocations();
+    }
+  }, [ganadero]);
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Monitoreo de Vacas</h1>
+
+      {locations.length === 0 ? (
+        <p>No hay datos de ubicación disponibles.</p>
+      ) : (
+        <MapContainer center={[0, 0]} zoom={2} style={{ height: "500px" }}>
+          <TileLayer
+            attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {locations.map((animal) => (
+            <Marker
+              key={animal.name}
+              position={[animal.latitude, animal.longitude]}
+            >
+              <Popup>
+                {animal.name} - {animal.location}
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      )}
+    </div>
+  );
+}
+
+export default Contact;
+
+// src/pages/Enfermedades.jsx
+
+import React, { useState, useEffect, useContext } from "react";
+import { supabase } from "../client";
+import { AuthContext } from "../context/AuthContext";
+
+function Enfermedades() {
+  const { ganadero } = useContext(AuthContext);
+  const [animals, setAnimals] = useState([]);
+  const [selectedAnimalId, setSelectedAnimalId] = useState("");
+  const [healthRecords, setHealthRecords] = useState([]);
+  const [newRecord, setNewRecord] = useState({
+    temperature: "",
+    heart_rate: "",
+    respiratory_rate: "",
+    notes: "",
+  });
+  const [message, setMessage] = useState("");
+
+  // Obtener la lista de animales del ganadero
+  const fetchAnimals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("animals")
+        .select("*")
+        .eq("ganadero_id", ganadero.id);
+
+      if (error) {
+        console.error("Error fetching animals:", error);
+      } else {
+        setAnimals(data);
+      }
+    } catch (err) {
+      console.error("Error fetching animals:", err);
+    }
+  };
+
+  // Obtener los registros de salud del animal seleccionado
+  const fetchHealthRecords = async (animalId) => {
+    try {
+      const { data, error } = await supabase
+        .from("health_records")
+        .select("*")
+        .eq("animal_id", animalId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching health records:", error);
+      } else {
+        setHealthRecords(data);
+      }
+    } catch (err) {
+      console.error("Error fetching health records:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (ganadero) {
+      fetchAnimals();
+    }
+  }, [ganadero]);
+
+  useEffect(() => {
+    if (selectedAnimalId) {
+      fetchHealthRecords(selectedAnimalId);
+    }
+  }, [selectedAnimalId]);
+
+  // Manejar la selección de un animal
+  const handleAnimalSelect = (e) => {
+    setSelectedAnimalId(e.target.value);
+    setHealthRecords([]);
+  };
+
+  // Manejar cambios en el formulario
+  const handleChange = (e) => {
+    setNewRecord({ ...newRecord, [e.target.name]: e.target.value });
+  };
+
+  // Manejar el envío del formulario
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    // Validar datos
+    if (!selectedAnimalId) {
+      setMessage("Por favor, selecciona un animal.");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("health_records").insert([
+        {
+          animal_id: selectedAnimalId,
+          temperature: parseFloat(newRecord.temperature),
+          heart_rate: newRecord.heart_rate
+            ? parseInt(newRecord.heart_rate)
+            : null,
+          respiratory_rate: newRecord.respiratory_rate
+            ? parseInt(newRecord.respiratory_rate)
+            : null,
+          notes: newRecord.notes || null,
+        },
+      ]);
+
+      if (error) {
+        console.error("Error inserting health record:", error);
+        setMessage("Error al agregar el registro de salud.");
+      } else {
+        setNewRecord({
+          temperature: "",
+          heart_rate: "",
+          respiratory_rate: "",
+          notes: "",
+        });
+        fetchHealthRecords(selectedAnimalId);
+        setMessage("Registro de salud agregado exitosamente.");
+      }
+    } catch (err) {
+      console.error("Error inserting health record:", err);
+      setMessage("Error al agregar el registro de salud.");
+    }
+  };
+
+  // Determinar si el animal está enfermo
+  const isAnimalSick = (record) => {
+    const normalTemp = 38.5; // Temperatura normal en grados Celsius
+    const normalHeartRate = 60; // Frecuencia cardíaca normal
+    const normalRespiratoryRate = 30; // Frecuencia respiratoria normal
+
+    if (
+      record.temperature > normalTemp ||
+      (record.heart_rate && record.heart_rate > normalHeartRate) ||
+      (record.respiratory_rate &&
+        record.respiratory_rate > normalRespiratoryRate)
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        Monitoreo de Enfermedades
+      </h1>
+
+      {/* Seleccionar un animal */}
+      <div className="mb-8 flex flex-col items-center">
+        <label className="mb-2 text-lg font-semibold">
+          Selecciona un Animal:
+        </label>
+        <select
+          value={selectedAnimalId}
+          onChange={handleAnimalSelect}
+          className="border p-2 rounded w-64"
+        >
+          <option value="">-- Seleccionar --</option>
+          {animals.map((animal) => (
+            <option key={animal.id} value={animal.id}>
+              {animal.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Formulario para agregar un nuevo registro de salud */}
+      {selectedAnimalId && (
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-4 text-center">
+            Agregar Registro de Salud
+          </h2>
+          <form onSubmit={handleSubmit} className="flex flex-col items-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="number"
+                step="0.1"
+                name="temperature"
+                placeholder="Temperatura (°C)"
+                value={newRecord.temperature}
+                onChange={handleChange}
+                required
+                className="border p-2 rounded w-64"
+              />
+              <input
+                type="number"
+                name="heart_rate"
+                placeholder="Frecuencia Cardíaca (latidos/min)"
+                value={newRecord.heart_rate}
+                onChange={handleChange}
+                className="border p-2 rounded w-64"
+              />
+              <input
+                type="number"
+                name="respiratory_rate"
+                placeholder="Frecuencia Respiratoria (resp/min)"
+                value={newRecord.respiratory_rate}
+                onChange={handleChange}
+                className="border p-2 rounded w-64"
+              />
+              <textarea
+                name="notes"
+                placeholder="Notas"
+                value={newRecord.notes}
+                onChange={handleChange}
+                className="border p-2 rounded w-64 md:col-span-2"
+              ></textarea>
+            </div>
+            {message && <p className="mt-4">{message}</p>}
+            <button
+              type="submit"
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            >
+              Agregar Registro
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Mostrar registros de salud */}
+      {healthRecords.length > 0 && (
+        <div className="mb-12">
+          <h2 className="text-2xl font-semibold mb-4 text-center">
+            Historial de Salud
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border">
+              <thead>
+                <tr>
+                  <th className="py-2 px-4 border-b">Fecha</th>
+                  <th className="py-2 px-4 border-b">Temperatura (°C)</th>
+                  <th className="py-2 px-4 border-b">Frecuencia Cardíaca</th>
+                  <th className="py-2 px-4 border-b">
+                    Frecuencia Respiratoria
+                  </th>
+                  <th className="py-2 px-4 border-b">Notas</th>
+                  <th className="py-2 px-4 border-b">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {healthRecords.map((record) => (
+                  <tr key={record.id} className="hover:bg-gray-100">
+                    <td className="py-2 px-4 border-b">
+                      {new Date(record.created_at).toLocaleString()}
+                    </td>
+                    <td className="py-2 px-4 border-b">{record.temperature}</td>
+                    <td className="py-2 px-4 border-b">
+                      {record.heart_rate || "N/A"}
+                    </td>
+                    <td className="py-2 px-4 border-b">
+                      {record.respiratory_rate || "N/A"}
+                    </td>
+                    <td className="py-2 px-4 border-b">
+                      {record.notes || "N/A"}
+                    </td>
+                    <td className="py-2 px-4 border-b">
+                      {isAnimalSick(record) ? (
+                        <span className="text-red-600 font-bold">Enfermo</span>
+                      ) : (
+                        <span className="text-green-600 font-bold">
+                          Saludable
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default Enfermedades;
+
+// src/pages/FAQ.jsx
+import React, { useState } from "react";
+import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+
+const faqData = [
+  {
+    question: "¿Cómo puedo agregar un producto al carrito?",
+    answer:
+      "En la página de la tienda, haz clic en el botón 'Agregar al Carrito' debajo del producto que deseas comprar.",
+  },
+  {
+    question: "¿Cuáles son las opciones de pago disponibles?",
+    answer:
+      "Aceptamos tarjetas de crédito, débito y transferencias bancarias. También puedes contactar con nosotros para opciones de pago personalizadas.",
+  },
+  {
+    question: "¿Cuál es el tiempo de envío estimado?",
+    answer:
+      "El tiempo de envío varía según tu ubicación. Generalmente, los pedidos se entregan entre 3 y 7 días hábiles.",
+  },
+  {
+    question: "¿Puedo cancelar mi pedido después de haberlo realizado?",
+    answer:
+      "Sí, puedes cancelar tu pedido dentro de las primeras 24 horas después de realizarlo contactándonos directamente.",
+  },
+  {
+    question: "¿Ofrecen garantía en sus productos?",
+    answer:
+      "Todos nuestros productos cuentan con una garantía de 1 año contra defectos de fabricación.",
+  },
+  // Agrega más preguntas y respuestas según sea necesario
+];
+
+function FAQ() {
+  const [activeIndex, setActiveIndex] = useState(null);
+
+  const toggleFAQ = (index) => {
+    setActiveIndex(activeIndex === index ? null : index);
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6 text-center text-green-700">
+        Preguntas Frecuentes
+      </h1>
+      <div className="max-w-2xl mx-auto">
+        {faqData.map((item, index) => (
+          <div key={index} className="border-b border-gray-200 py-4">
+            <button
+              className="w-full flex justify-between items-center text-left focus:outline-none"
+              onClick={() => toggleFAQ(index)}
+            >
+              <span className="text-lg font-medium">{item.question}</span>
+              {activeIndex === index ? (
+                <FaChevronUp className="text-gray-600" />
+              ) : (
+                <FaChevronDown className="text-gray-600" />
+              )}
+            </button>
+            {activeIndex === index && (
+              <div className="mt-2 text-gray-600">{item.answer}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default FAQ;
+
+// src/pages/Home.jsx
+
+import React from "react";
+import { Link } from "react-router-dom";
+import {
+  FaRegClipboard,
+  FaMapMarkedAlt,
+  FaChartLine,
+  FaStethoscope,
+  FaRobot,
+  FaStore,
+  FaShoppingCart,
+} from "react-icons/fa";
+
+const disciplines = [
+  {
+    name: "Registro de Ganado",
+    icon: <FaRegClipboard size={50} className="text-green-600 mx-auto" />,
+    link: "/registrodevacas",
+  },
+  {
+    name: "Ubicación de Ganado",
+    icon: <FaMapMarkedAlt size={50} className="text-green-600 mx-auto" />,
+    link: "/mapa",
+  },
+  {
+    name: "Monitoreo de Ganado",
+    icon: <FaChartLine size={50} className="text-green-600 mx-auto" />,
+    link: "/monitoreo",
+  },
+  {
+    name: "Enfermedades de Ganado",
+    icon: <FaStethoscope size={50} className="text-green-600 mx-auto" />,
+    link: "/enfermedades",
+  },
+  {
+    name: "Asistente de IA",
+    icon: <FaRobot size={50} className="text-green-600 mx-auto" />,
+    link: "/contact",
+  },
+  {
+    name: "Tienda",
+    icon: <FaStore size={50} className="text-green-600 mx-auto" />,
+    link: "/shop",
+  },
+  {
+    name: "Carrito",
+    icon: <FaShoppingCart size={50} className="text-green-600 mx-auto" />,
+    link: "/cart",
+  },
+];
+
+const Home = () => {
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-400 to-green-700 py-12 px-4">
+      <div className="container mx-auto">
+        {/* Saludo estático */}
+        <h1 className="text-4xl font-extrabold mb-12 text-center text-white">
+          ¡Bienvenido a Agrotrack!
+        </h1>
+
+        {/* Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {disciplines.map((discipline) => (
+            <Link
+              key={discipline.name}
+              to={discipline.link}
+              className="group relative block bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transform transition duration-500 hover:scale-105"
+            >
+              <div className="flex justify-center items-center h-56 bg-gray-100 group-hover:bg-gray-200 transition duration-500">
+                {discipline.icon}
+              </div>
+              <div className="p-6">
+                <h2 className="text-xl font-bold text-gray-800 group-hover:text-green-600 transition duration-300 text-center">
+                  {discipline.name}
+                </h2>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Home;
+
+// src/pages/Login.jsx
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+
+function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState(""); // Opcional si no usas autenticación
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    // Aquí, dado que la autenticación está deshabilitada,
+    // simplemente redirigimos a /home
+    // Puedes agregar lógica adicional si lo deseas
+    navigate("/home");
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-green-400 to-green-700">
+      <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md mx-4">
+        <div className="text-center mb-8">
+          <img
+            src="/logo.png"
+            alt="Agrotrack Logo"
+            className="h-20 w-auto mx-auto mb-4"
+          />
+          <h1 className="text-3xl font-bold text-gray-800">Iniciar Sesión</h1>
+        </div>
+        {error && (
+          <p className="text-red-600 mb-4 text-center font-semibold">{error}</p>
+        )}
+        <form onSubmit={handleLogin} className="space-y-6">
+          <div>
+            <label className="block text-gray-700 font-semibold mb-2">
+              Correo Electrónico
+            </label>
+            <input
+              type="email"
+              placeholder="Ingresa tu correo electrónico"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+          {/* Opcional: Campo de Contraseña */}
+          {/* <div>
+            <label className="block text-gray-700 font-semibold mb-2">
+              Contraseña
+            </label>
+            <input
+              type="password"
+              placeholder="Ingresa tu contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div> */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-300"
+          >
+            {isLoading ? "Cargando..." : "Iniciar Sesión"}
+          </button>
+        </form>
+        <p className="mt-6 text-center text-gray-600">
+          ¿No tienes una cuenta?{" "}
+          <Link
+            to="/signup"
+            className="text-green-600 font-semibold hover:underline"
+          >
+            Regístrate aquí
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default Login;
+
+// src/pages/Mapa.jsx
+
+import React, { useState, useEffect, useContext } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Circle,
+  Tooltip,
+  useMap,
+} from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import { supabase } from "../client";
+import { AuthContext } from "../context/AuthContext";
+
+// Importamos la imagen de la sombra del marcador de Leaflet
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+// Definir colores para cada grupo
+const groupColors = {
+  "Grupo A": "#1E90FF", // Azul
+  "Grupo B": "#32CD32", // Verde
+  "Grupo C": "#FFA500", // Naranja
+  // Agrega más grupos y colores según sea necesario
+};
+
+// Función para crear iconos personalizados con emoji de vaca
+const createCowIcon = (color) => {
+  return L.divIcon({
+    html: `<div style="background-color: ${color}; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+             🐮
+           </div>`,
+    className: "",
+    iconSize: [30, 30],
+    iconAnchor: [15, 30],
+    popupAnchor: [0, -30],
+  });
+};
+
+// Componente para centrar el mapa cuando se actualiza el centro
+function ChangeView({ center, zoom }) {
+  const map = useMap();
+  map.setView(center, zoom);
+  return null;
+}
+
+function Mapa() {
+  const { ganadero } = useContext(AuthContext);
+  const [animals, setAnimals] = useState([]);
+  const [simulationAnimals, setSimulationAnimals] = useState([]);
+  const [groupCircles, setGroupCircles] = useState([]);
+  const [center, setCenter] = useState([21.8469, -102.7208]); // Centro en Calvillo, Aguascalientes
+  const [radius, setRadius] = useState(1000); // Radio en metros (puede ser dinámico por grupo)
+  const [error, setError] = useState("");
+  const [notificationPermission, setNotificationPermission] =
+    useState("default");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filteredAnimals, setFilteredAnimals] = useState([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [originalSimulationAnimals, setOriginalSimulationAnimals] = useState(
+    []
+  );
+  const [selectedFilter, setSelectedFilter] = useState("All");
+  const [selectedCow, setSelectedCow] = useState(null);
+  const [simulationSteps, setSimulationSteps] = useState(0);
+
+  // Función para obtener la ubicación de los animales
+  const fetchAnimals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("animals")
+        .select("*")
+        .eq("ganadero_id", ganadero.id);
+
+      if (error) {
+        console.error("Error fetching animals:", error);
+        setError("Error al obtener las ubicaciones.");
+      } else {
+        // Añadimos el estado inicial de cada animal
+        const animalsWithStatus = data.map((animal) => ({
+          ...animal,
+          status: "Normal", // Estados: Normal, Posible Robo, Robo
+        }));
+        setAnimals(animalsWithStatus);
+        setSimulationAnimals(JSON.parse(JSON.stringify(animalsWithStatus))); // Clonamos los datos para la simulación
+        setFilteredAnimals(animalsWithStatus);
+        calculateGroupCircles(animalsWithStatus);
+      }
+    } catch (err) {
+      console.error("Error fetching animals:", err);
+      setError("Error al obtener las ubicaciones.");
+    }
+  };
+
+  // Calcular centros y radios para cada grupo
+  const calculateGroupCircles = (animalsList) => {
+    const groups = {};
+
+    // Agrupar animales por grupo
+    animalsList.forEach((animal) => {
+      if (!groups[animal.group_name]) {
+        groups[animal.group_name] = [];
+      }
+      groups[animal.group_name].push(animal);
+    });
+
+    // Calcular centro y radio para cada grupo
+    const circles = Object.keys(groups).map((group) => {
+      const groupAnimals = groups[group];
+      const centroid = calculateCentroid(groupAnimals);
+      const maxDistance = calculateMaxDistance(centroid, groupAnimals) + 100; // Añadir buffer de 100 metros
+
+      return {
+        group,
+        centroid,
+        radius: maxDistance,
+        color: groupColors[group] || "#0000FF", // Azul por defecto
+      };
+    });
+
+    setGroupCircles(circles);
+
+    // Si hay grupos, establecer el centro del mapa en el primer grupo
+    if (circles.length > 0) {
+      setCenter([circles[0].centroid.lat, circles[0].centroid.lng]);
+    } else {
+      setCenter([21.8469, -102.7208]); // Centro predeterminado en Calvillo
+    }
+  };
+
+  // Calcular el centro (centroid) de un grupo de animales
+  const calculateCentroid = (groupAnimals) => {
+    const sum = groupAnimals.reduce(
+      (acc, animal) => {
+        return {
+          lat: acc.lat + animal.latitude,
+          lng: acc.lng + animal.longitude,
+        };
+      },
+      { lat: 0, lng: 0 }
+    );
+
+    return {
+      lat: sum.lat / groupAnimals.length,
+      lng: sum.lng / groupAnimals.length,
+    };
+  };
+
+  // Calcular la distancia máxima desde el centro a cualquier animal en el grupo
+  const calculateMaxDistance = (centroid, groupAnimals) => {
+    let maxDist = 0;
+    groupAnimals.forEach((animal) => {
+      const distance = getDistanceFromLatLonInMeters(
+        centroid.lat,
+        centroid.lng,
+        animal.latitude,
+        animal.longitude
+      );
+      if (distance > maxDist) {
+        maxDist = distance;
+      }
+    });
+    return maxDist;
+  };
+
+  useEffect(() => {
+    if (ganadero) {
+      fetchAnimals();
+    }
+  }, [ganadero]);
+
+  // Solicitar permiso para notificaciones al montar el componente
+  useEffect(() => {
+    if ("Notification" in window) {
+      Notification.requestPermission().then((permission) => {
+        setNotificationPermission(permission);
+      });
+    }
+  }, []);
+
+  // Simulación de actualización de coordenadas
+  const simulateMovement = () => {
+    if (!selectedCow) {
+      alert("Por favor, selecciona una vaca para simular su movimiento.");
+      return;
+    }
+
+    if (simulationSteps >= 4) {
+      alert("La simulación ha alcanzado el número máximo de movimientos.");
+      return;
+    }
+
+    const updatedAnimals = simulationAnimals.map((animal) => {
+      if (animal.id !== selectedCow.id) return animal;
+
+      const deltaLat = (Math.random() - 0.5) * 0.001; // Cambio mayor en latitud
+      const deltaLng = (Math.random() - 0.5) * 0.001; // Cambio mayor en longitud
+
+      return {
+        ...animal,
+        latitude: animal.latitude + deltaLat,
+        longitude: animal.longitude + deltaLng,
+      };
+    });
+
+    setSimulationAnimals(updatedAnimals);
+    setSimulationSteps((prev) => prev + 1);
+    applyFilters(updatedAnimals, selectedFilter);
+    recalculateGroupCircles(updatedAnimals);
+    updateStatuses(updatedAnimals);
+  };
+
+  // Simular robo de ganado (movimiento aleatorio fuera del grupo)
+  const simulateTheft = () => {
+    if (!selectedCow) {
+      alert("Por favor, selecciona una vaca para simular su robo.");
+      return;
+    }
+
+    const updatedAnimals = simulationAnimals.map((animal) => {
+      if (animal.id !== selectedCow.id) return animal;
+
+      // Desplazamiento significativo fuera del radio del grupo
+      const deltaLat =
+        (Math.random() > 0.5 ? 1 : -1) * (0.005 + Math.random() * 0.005);
+      const deltaLng =
+        (Math.random() > 0.5 ? 1 : -1) * (0.005 + Math.random() * 0.005);
+
+      return {
+        ...animal,
+        latitude: animal.latitude + deltaLat,
+        longitude: animal.longitude + deltaLng,
+        status: "Robo",
+      };
+    });
+
+    setSimulationAnimals(updatedAnimals);
+    applyFilters(updatedAnimals, selectedFilter);
+    recalculateGroupCircles(updatedAnimals);
+    checkAnimalsOutsideRadius(updatedAnimals);
+  };
+
+  // Recalcular centros y radios después de la simulación
+  const recalculateGroupCircles = (animalsList) => {
+    calculateGroupCircles(animalsList);
+  };
+
+  // Comprobar si algún animal está fuera del radio
+  const checkAnimalsOutsideRadius = (animalsToCheck = simulationAnimals) => {
+    const animalsOutside = animalsToCheck.filter((animal) => {
+      // Encontrar el grupo del animal
+      const groupCircle = groupCircles.find(
+        (circle) => circle.group === animal.group_name
+      );
+      if (!groupCircle) return false;
+
+      const distance = getDistanceFromLatLonInMeters(
+        groupCircle.centroid.lat,
+        groupCircle.centroid.lng,
+        animal.latitude,
+        animal.longitude
+      );
+
+      return distance > groupCircle.radius;
+    });
+
+    if (animalsOutside.length > 0) {
+      const message = `¡Alerta! Los siguientes animales están fuera de su grupo:\n${animalsOutside
+        .map((a) => a.name)
+        .join(", ")}`;
+
+      alert(message);
+
+      // Enviar notificación si se permite
+      if (notificationPermission === "granted") {
+        new Notification("Alerta de Ganado", {
+          body: message,
+          icon: "/agrotrack.png", // Asegúrate de tener este icono en tu carpeta pública
+        });
+      }
+
+      // Actualizar el estado de los animales fuera del radio
+      const updatedAnimals = animalsToCheck.map((animal) => {
+        const groupCircle = groupCircles.find(
+          (circle) => circle.group === animal.group_name
+        );
+        if (!groupCircle) return animal;
+
+        const distance = getDistanceFromLatLonInMeters(
+          groupCircle.centroid.lat,
+          groupCircle.centroid.lng,
+          animal.latitude,
+          animal.longitude
+        );
+
+        if (distance > groupCircle.radius * 2) {
+          return { ...animal, status: "Robo" };
+        } else if (distance > groupCircle.radius) {
+          return { ...animal, status: "Posible Robo" };
+        } else {
+          return { ...animal, status: "Normal" };
+        }
+      });
+
+      setSimulationAnimals(updatedAnimals);
+      setFilteredAnimals(applyFilter(updatedAnimals, selectedFilter));
+    } else {
+      alert("Todos los animales están dentro de su grupo.");
+      // Actualizar el estado de los animales a Normal
+      const updatedAnimals = animalsToCheck.map((animal) => ({
+        ...animal,
+        status: "Normal",
+      }));
+      setSimulationAnimals(updatedAnimals);
+      setFilteredAnimals(applyFilter(updatedAnimals, selectedFilter));
+    }
+  };
+
+  // Función para actualizar los estados de los animales
+  const updateStatuses = (animalsList) => {
+    const updatedAnimals = animalsList.map((animal) => {
+      const groupCircle = groupCircles.find(
+        (circle) => circle.group === animal.group_name
+      );
+      if (!groupCircle) return { ...animal, status: "Normal" };
+
+      const distance = getDistanceFromLatLonInMeters(
+        groupCircle.centroid.lat,
+        groupCircle.centroid.lng,
+        animal.latitude,
+        animal.longitude
+      );
+
+      if (distance > groupCircle.radius * 2) {
+        return { ...animal, status: "Robo" };
+      } else if (distance > groupCircle.radius) {
+        return { ...animal, status: "Posible Robo" };
+      } else {
+        return { ...animal, status: "Normal" };
+      }
+    });
+
+    setSimulationAnimals(updatedAnimals);
+    setFilteredAnimals(applyFilter(updatedAnimals, selectedFilter));
+  };
+
+  // Función para calcular la distancia entre dos coordenadas
+  function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+    var R = 6371000; // Radio de la Tierra en metros
+    var dLat = deg2rad(lat2 - lat1);
+    var dLon = deg2rad(lon2 - lon1);
+    var a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(lat1)) *
+        Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    var d = R * c;
+    return d;
+  }
+
+  function deg2rad(deg) {
+    return deg * (Math.PI / 180);
+  }
+
+  // Funciones para Simulaciones
+  const startSimulation = () => {
+    if (!selectedCow) {
+      alert("Por favor, selecciona una vaca para iniciar la simulación.");
+      return;
+    }
+    setIsSimulating(true);
+    setOriginalSimulationAnimals(JSON.parse(JSON.stringify(simulationAnimals))); // Guardar estado original
+    setSimulationSteps(0);
+  };
+
+  const resetSimulation = () => {
+    setSimulationAnimals(originalSimulationAnimals);
+    setFilteredAnimals(applyFilter(originalSimulationAnimals, selectedFilter));
+    recalculateGroupCircles(originalSimulationAnimals);
+    setIsSimulating(false);
+    setSelectedCow(null);
+    setSimulationSteps(0);
+  };
+
+  // Manejar Búsqueda y Filtro
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    applyFilters(simulationAnimals, value);
+  };
+
+  const handleFilterChange = (e) => {
+    const value = e.target.value;
+    setSelectedFilter(value);
+    applyFilters(simulationAnimals, value);
+  };
+
+  const applyFilters = (animalsList, filter) => {
+    if (filter === "All") {
+      setFilteredAnimals(animalsList);
+    } else if (groupColors[filter]) {
+      // Si el filtro es un grupo
+      setCenterOnGroup(filter);
+      setFilteredAnimals(
+        animalsList.filter((animal) => animal.group_name === filter)
+      );
+    } else {
+      // Si el filtro es una vaca específica
+      const selected = animalsList.find((animal) => animal.name === filter);
+      if (selected) {
+        setCenter([selected.latitude, selected.longitude]);
+        setFilteredAnimals([selected]);
+      }
+    }
+  };
+
+  const applyFilter = (animalsList, filter) => {
+    if (filter === "All") {
+      return animalsList;
+    } else if (groupColors[filter]) {
+      // Si el filtro es un grupo
+      return animalsList.filter((animal) => animal.group_name === filter);
+    } else {
+      // Si el filtro es una vaca específica
+      return animalsList.filter((animal) => animal.name === filter);
+    }
+  };
+
+  // Centrar el mapa en el grupo seleccionado
+  const setCenterOnGroup = (group) => {
+    const groupCircle = groupCircles.find((c) => c.group === group);
+    if (groupCircle) {
+      setCenter([groupCircle.centroid.lat, groupCircle.centroid.lng]);
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-4xl font-bold mb-6 text-center text-green-700">
+        Mapa de Ubicación del Ganado
+      </h1>
+      {error && <p className="text-red-600 text-center mb-4">{error}</p>}
+
+      {/* Controles de Búsqueda y Filtro */}
+      <div className="flex flex-col md:flex-row justify-center items-center mb-6 space-y-4 md:space-y-0 md:space-x-4">
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={handleSearchChange}
+          placeholder="Buscar vaca por nombre..."
+          className="border border-gray-300 p-2 rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+        <select
+          value={selectedFilter}
+          onChange={handleFilterChange}
+          className="border border-gray-300 p-2 rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-green-500"
+        >
+          <option value="All">Ver Todas las Vacas</option>
+          <optgroup label="Grupos">
+            {Object.keys(groupColors).map((group) => (
+              <option key={group} value={group}>
+                {group}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Vacas">
+            {animals.map((animal) => (
+              <option key={animal.id} value={animal.name}>
+                {animal.name}
+              </option>
+            ))}
+          </optgroup>
+        </select>
+      </div>
+
+      {/* Sección del Mapa Real */}
+      <div className="mb-12">
+        <h2 className="text-3xl font-semibold mb-4 text-center text-blue-600">
+          Mapa Real
+        </h2>
+        {animals.length === 0 ? (
+          <p className="text-center">No hay datos de ubicación disponibles.</p>
+        ) : (
+          <div className="flex justify-center">
+            <MapContainer
+              center={center}
+              zoom={15}
+              className="h-96 w-full md:w-4/5 lg:w-3/5"
+            >
+              <ChangeView center={center} zoom={15} />
+              <TileLayer
+                attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {/* Círculos de cada grupo */}
+              {groupCircles.map((circle) => (
+                <Circle
+                  key={circle.group}
+                  center={[circle.centroid.lat, circle.centroid.lng]}
+                  radius={circle.radius}
+                  pathOptions={{ color: circle.color, fillOpacity: 0.1 }}
+                >
+                  <Tooltip
+                    direction="top"
+                    offset={[0, -10]}
+                    opacity={1}
+                    permanent
+                  >
+                    {circle.group}
+                  </Tooltip>
+                </Circle>
+              ))}
+
+              {/* Marcadores de animales */}
+              {animals.map((animal) => (
+                <Marker
+                  key={animal.id}
+                  position={[animal.latitude, animal.longitude]}
+                  icon={createCowIcon(
+                    groupColors[animal.group_name] || "#0000FF"
+                  )} // Azul por defecto
+                >
+                  <Popup>
+                    <div>
+                      <h3 className="font-bold text-lg">{animal.name}</h3>
+                      <p>
+                        <strong>Especie:</strong> {animal.species}
+                      </p>
+                      <p>
+                        <strong>Raza:</strong> {animal.breed}
+                      </p>
+                      <p>
+                        <strong>Edad:</strong> {animal.age} años
+                      </p>
+                      <p>
+                        <strong>Peso:</strong> {animal.weight} kg
+                      </p>
+                      <p>
+                        <strong>Grupo:</strong> {animal.group_name}
+                      </p>
+                      <p>
+                        <strong>Ubicación:</strong>{" "}
+                        {animal.location || "Sin ubicación específica"}
+                      </p>
+                      <p>
+                        <strong>Estado:</strong> {animal.status}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Controles de Simulación */}
+      <div className="flex flex-col items-center mb-6 space-y-4">
+        <div className="flex flex-wrap justify-center space-x-4">
+          {!isSimulating ? (
+            <button
+              onClick={startSimulation}
+              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition"
+            >
+              Iniciar Simulación
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={simulateMovement}
+                className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 transition"
+              >
+                Simular Movimiento
+              </button>
+              <button
+                onClick={simulateTheft}
+                className="bg-red-600 text-white px-6 py-3 rounded-md hover:bg-red-700 transition"
+              >
+                Simular Robo de Ganado
+              </button>
+              <button
+                onClick={resetSimulation}
+                className="bg-gray-600 text-white px-6 py-3 rounded-md hover:bg-gray-700 transition"
+              >
+                Reiniciar Simulación
+              </button>
+            </>
+          )}
+        </div>
+        <div className="flex items-center space-x-2">
+          <label htmlFor="radius" className="font-semibold">
+            Radio (metros):
+          </label>
+          <input
+            type="number"
+            id="radius"
+            value={radius}
+            onChange={(e) => setRadius(parseInt(e.target.value))}
+            className="border border-gray-300 p-2 rounded-md w-32 focus:outline-none focus:ring-2 focus:ring-green-500"
+            min="100"
+            max="5000"
+          />
+        </div>
+        {/* Selección de Vaca para Simulación */}
+        {isSimulating && (
+          <div className="flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-4">
+            <select
+              value={selectedCow ? selectedCow.id : ""}
+              onChange={(e) => {
+                const cowId = e.target.value;
+                const cow = simulationAnimals.find(
+                  (animal) => animal.id === cowId
+                );
+                setSelectedCow(cow || null);
+              }}
+              className="border border-gray-300 p-2 rounded-md w-64 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Selecciona una vaca para simular</option>
+              {simulationAnimals.map((animal) => (
+                <option key={animal.id} value={animal.id}>
+                  {animal.name} ({animal.group_name})
+                </option>
+              ))}
+            </select>
+            {selectedCow && (
+              <p className="text-center">
+                Simulando: <strong>{selectedCow.name}</strong> (
+                {selectedCow.group_name})
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Sección del Mapa de Simulación */}
+      <div className="mb-12">
+        <h2 className="text-3xl font-semibold mb-4 text-center text-purple-600">
+          Mapa de Simulación
+        </h2>
+        {filteredAnimals.length === 0 ? (
+          <p className="text-center">
+            No hay datos de ubicación disponibles para la simulación.
+          </p>
+        ) : (
+          <div className="flex justify-center">
+            <MapContainer
+              center={center}
+              zoom={15}
+              className="h-96 w-full md:w-4/5 lg:w-3/5"
+            >
+              <ChangeView center={center} zoom={15} />
+              <TileLayer
+                attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {/* Círculo del radio */}
+              <Circle
+                center={center}
+                radius={radius}
+                color="green"
+                fillOpacity={0.1}
+              />
+
+              {/* Círculos de cada grupo en simulación */}
+              {groupCircles.map((circle) => (
+                <Circle
+                  key={`${circle.group}-sim`}
+                  center={[circle.centroid.lat, circle.centroid.lng]}
+                  radius={circle.radius}
+                  pathOptions={{ color: circle.color, fillOpacity: 0.1 }}
+                >
+                  <Tooltip
+                    direction="top"
+                    offset={[0, -10]}
+                    opacity={1}
+                    permanent
+                  >
+                    {circle.group}
+                  </Tooltip>
+                </Circle>
+              ))}
+
+              {/* Marcadores de animales simulados */}
+              {filteredAnimals.map((animal) => (
+                <Marker
+                  key={animal.id}
+                  position={[animal.latitude, animal.longitude]}
+                  icon={
+                    animal.status === "Robo"
+                      ? createCowIcon("#FF0000") // Rojo para Robo
+                      : animal.status === "Posible Robo"
+                      ? createCowIcon("#FFD700") // Amarillo para Posible Robo
+                      : createCowIcon(
+                          groupColors[animal.group_name] || "#0000FF"
+                        ) // Azul por defecto
+                  }
+                >
+                  <Popup>
+                    <div>
+                      <h3 className="font-bold text-lg">{animal.name}</h3>
+                      <p>
+                        <strong>Especie:</strong> {animal.species}
+                      </p>
+                      <p>
+                        <strong>Raza:</strong> {animal.breed}
+                      </p>
+                      <p>
+                        <strong>Edad:</strong> {animal.age} años
+                      </p>
+                      <p>
+                        <strong>Peso:</strong> {animal.weight} kg
+                      </p>
+                      <p>
+                        <strong>Grupo:</strong> {animal.group_name}
+                      </p>
+                      <p>
+                        <strong>Ubicación:</strong>{" "}
+                        {animal.location || "Sin ubicación específica"}
+                      </p>
+                      <p>
+                        <strong>Estado:</strong> {animal.status}
+                      </p>
+                      {animal.status === "Robo" && (
+                        <p className="text-red-600 font-bold">
+                          ¡Robo Detectado!
+                        </p>
+                      )}
+                      {animal.status === "Posible Robo" && (
+                        <p className="text-yellow-500 font-bold">
+                          ¡Posible Robo!
+                        </p>
+                      )}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Tabla de Datos de Vacas */}
+      <div className="mb-12">
+        <h2 className="text-3xl font-semibold mb-4 text-center text-indigo-600">
+          Tabla de Vacas
+        </h2>
+        {filteredAnimals.length === 0 ? (
+          <p className="text-center">No hay datos disponibles para mostrar.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+              <thead className="bg-gray-800 text-white">
+                <tr>
+                  <th className="w-1/6 py-3 px-4 uppercase font-semibold text-sm">
+                    Nombre
+                  </th>
+                  <th className="w-1/6 py-3 px-4 uppercase font-semibold text-sm">
+                    Grupo
+                  </th>
+                  <th className="w-1/6 py-3 px-4 uppercase font-semibold text-sm">
+                    Latitud
+                  </th>
+                  <th className="w-1/6 py-3 px-4 uppercase font-semibold text-sm">
+                    Longitud
+                  </th>
+                  <th className="w-1/6 py-3 px-4 uppercase font-semibold text-sm">
+                    Estado
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-700">
+                {filteredAnimals.map((animal) => (
+                  <tr key={animal.id} className="border-b hover:bg-gray-100">
+                    <td className="py-3 px-4">{animal.name}</td>
+                    <td className="py-3 px-4">{animal.group_name}</td>
+                    <td className="py-3 px-4">{animal.latitude.toFixed(6)}</td>
+                    <td className="py-3 px-4">{animal.longitude.toFixed(6)}</td>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          animal.status === "Normal"
+                            ? "bg-green-100 text-green-800"
+                            : animal.status === "Posible Robo"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
+                        {animal.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Mapa;
+
+// src/pages/Monitoreo.jsx
+
+import React, { useState, useEffect, useContext } from "react";
+import { supabase } from "../client";
+import { AuthContext } from "../context/AuthContext";
+import Tree from "react-d3-tree";
+
+function Monitoreo() {
+  const { ganadero } = useContext(AuthContext);
+  const [animals, setAnimals] = useState([]);
+  const [treeData, setTreeData] = useState(null);
+  const [selectedAnimalId, setSelectedAnimalId] = useState("");
+
+  // Función para obtener los animales
+  const fetchAnimals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("animals")
+        .select("*")
+        .eq("ganadero_id", ganadero.id);
+
+      if (error) {
+        console.error("Error fetching animals:", error);
+      } else {
+        setAnimals(data);
+      }
+    } catch (err) {
+      console.error("Error fetching animals:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (ganadero) {
+      fetchAnimals();
+    }
+  }, [ganadero]);
+
+  // Función para generar datos del árbol genealógico
+  const generateTreeDataForAnimal = (animalId) => {
+    if (!animalId) {
+      setTreeData(null);
+      return;
+    }
+
+    const buildTree = (animal) => {
+      if (!animal) return null;
+
+      const node = {
+        name: animal.name,
+        attributes: {
+          Especie: animal.species,
+          Raza: animal.breed || "N/A",
+          Edad: animal.age || "N/A",
+        },
+        children: [],
+      };
+
+      // Obtener la madre y el padre
+      const mother = animals.find((a) => a.id === animal.mother_id);
+      const father = animals.find((a) => a.id === animal.father_id);
+
+      // Construir los subárboles de la madre y el padre
+      if (mother) {
+        const motherTree = buildTree(mother);
+        if (motherTree) node.children.push(motherTree);
+      }
+
+      if (father) {
+        const fatherTree = buildTree(father);
+        if (fatherTree) node.children.push(fatherTree);
+      }
+
+      return node;
+    };
+
+    const selectedAnimal = animals.find((a) => a.id === animalId);
+    const tree = buildTree(selectedAnimal);
+
+    // Verificar si el árbol se generó correctamente
+    if (tree) {
+      setTreeData(tree);
+    } else {
+      setTreeData(null);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedAnimalId) {
+      generateTreeDataForAnimal(selectedAnimalId);
+    } else {
+      setTreeData(null);
+    }
+  }, [selectedAnimalId, animals]);
+
+  // Función para manejar la selección de un animal
+  const handleAnimalSelect = (e) => {
+    setSelectedAnimalId(e.target.value);
+  };
+
+  // Estilos personalizados para el árbol genealógico
+  const treeContainerStyles = {
+    width: "100%",
+    height: "500px",
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-green-400 to-green-700 py-12 px-4">
+      <div className="container mx-auto">
+        <h1 className="text-4xl font-extrabold mb-8 text-center text-white">
+          Monitoreo de Ganado
+        </h1>
+
+        {/* Seleccionar un animal para ver su árbol genealógico */}
+        <div className="mb-12 flex flex-col items-center">
+          <label className="mb-4 text-2xl font-semibold text-white">
+            Selecciona un Animal:
+          </label>
+          <select
+            value={selectedAnimalId}
+            onChange={handleAnimalSelect}
+            className="w-full max-w-md p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">-- Seleccionar --</option>
+            {animals.map((animal) => (
+              <option key={animal.id} value={animal.id}>
+                {animal.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Mostrar datos importantes del ganado */}
+        <div className="mb-12">
+          <h2 className="text-3xl font-semibold mb-6 text-center text-white">
+            Datos del Ganado
+          </h2>
+          {/* Tabla con los datos de los animales */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white rounded-lg shadow-lg overflow-hidden">
+              <thead className="bg-green-600 text-white">
+                <tr>
+                  <th className="py-3 px-4 text-left">Nombre</th>
+                  <th className="py-3 px-4 text-left">Especie</th>
+                  <th className="py-3 px-4 text-left">Raza</th>
+                  <th className="py-3 px-4 text-left">Edad</th>
+                  <th className="py-3 px-4 text-left">Peso (kg)</th>
+                  <th className="py-3 px-4 text-left">Grupo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {animals.map((animal, index) => (
+                  <tr
+                    key={animal.id}
+                    className={`${
+                      index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                    } hover:bg-gray-100`}
+                  >
+                    <td className="py-3 px-4">{animal.name}</td>
+                    <td className="py-3 px-4">{animal.species}</td>
+                    <td className="py-3 px-4">{animal.breed || "N/A"}</td>
+                    <td className="py-3 px-4">{animal.age || "N/A"}</td>
+                    <td className="py-3 px-4">{animal.weight || "N/A"}</td>
+                    <td className="py-3 px-4">{animal.group_name || "N/A"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Árbol Genealógico */}
+        <div className="mb-12">
+          <h2 className="text-3xl font-semibold mb-6 text-center text-white">
+            Árbol Genealógico
+          </h2>
+          {treeData ? (
+            <div className="flex justify-center">
+              <div
+                id="treeWrapper"
+                style={treeContainerStyles}
+                className="bg-white rounded-lg shadow-lg p-4"
+              >
+                <Tree
+                  data={treeData}
+                  orientation="vertical"
+                  translate={{ x: 250, y: 50 }}
+                  zoomable={true}
+                  scaleExtent={{ min: 0.5, max: 2 }}
+                  nodeSize={{ x: 200, y: 200 }}
+                  separation={{ siblings: 1, nonSiblings: 1.5 }}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="text-center text-white">
+              Selecciona un animal para ver su árbol genealógico.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Monitoreo;
+
+// src/pages/ProductDetails.jsx
+import React, { useContext } from "react";
+import { useParams, Link } from "react-router-dom";
+import { CartContext } from "../context/CartContext";
+import {
+  FaArrowLeft,
+  FaShoppingCart,
+  FaTools,
+  FaCogs,
+  FaShippingFast,
+  FaBolt,
+  FaLeaf,
+} from "react-icons/fa";
+
+// Lista de productos (puedes importarla si está en otro archivo)
+const products = [
+  {
+    id: "kit1",
+    name: "Agrotrack Kit",
+    description: "Kit básico de monitoreo para tu ganado.",
+    price: 1999.99,
+    image: "/kit.png",
+    icon: <FaTools size={40} color="#4CAF50" />,
+    specifications:
+      "Incluye sensores básicos, monitoreo en tiempo real y soporte técnico estándar.",
+  },
+  {
+    id: "service1",
+    name: "Servicio de Consultoría",
+    description: "Contáctanos para servicios personalizados.",
+    price: 0,
+    image: "/service.png",
+    icon: <FaCogs size={40} color="#2196F3" />,
+    specifications:
+      "Consultoría personalizada para optimizar tus operaciones ganaderas.",
+  },
+  {
+    id: "kit2",
+    name: "Agrotrack Avanzado",
+    description: "Kit avanzado con funcionalidades adicionales.",
+    price: 2999.99,
+    image: "/kit-advanced.png",
+    icon: <FaTools size={40} color="#4CAF50" />,
+    specifications:
+      "Sensores avanzados, integración con software de análisis y soporte premium.",
+  },
+  {
+    id: "service2",
+    name: "Soporte Técnico Premium",
+    description: "Soporte técnico prioritario 24/7.",
+    price: 4999.99,
+    image: "/support.png",
+    icon: <FaShippingFast size={40} color="#FF5722" />,
+    specifications:
+      "Soporte técnico prioritario, actualizaciones regulares y consultoría continua.",
+  },
+  {
+    id: "kit3",
+    name: "Agrotrack Profesional",
+    description: "Kit profesional para grandes operaciones ganaderas.",
+    price: 4999.99,
+    image: "/kit-professional.png",
+    icon: <FaBolt size={40} color="#FFC107" />,
+    specifications:
+      "Sensores de alta precisión, múltiples integraciones y soporte dedicado.",
+  },
+  {
+    id: "service3",
+    name: "Mantenimiento Regular",
+    description: "Servicio de mantenimiento mensual.",
+    price: 1499.99,
+    image: "/maintenance.png",
+    icon: <FaLeaf size={40} color="#8BC34A" />,
+    specifications:
+      "Mantenimiento preventivo, revisión de sensores y optimización del sistema.",
+  },
+];
+
+function ProductDetails() {
+  const { id } = useParams();
+  const { addToCart } = useContext(CartContext);
+
+  // Buscar el producto por ID
+  const product = products.find((item) => item.id === id);
+
+  if (!product) {
+    return (
+      <div className="container mx-auto p-4 flex flex-col items-center">
+        <h1 className="text-2xl font-bold mb-4">Producto no encontrado</h1>
+        <Link
+          to="/shop"
+          className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition"
+        >
+          Volver a la Tienda
+        </Link>
+      </div>
+    );
+  }
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(amount);
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <Link
+        to="/shop"
+        className="flex items-center text-green-700 hover:text-green-900 mb-6"
+      >
+        <FaArrowLeft className="mr-2" /> Volver a la Tienda
+      </Link>
+      <div className="flex flex-col md:flex-row bg-white rounded-lg shadow-md p-6">
+        <div className="md:w-1/2 flex flex-col items-center">
+          <div className="mb-4">{product.icon}</div>
+          <img
+            src={product.image}
+            alt={product.name}
+            className="h-64 w-auto mb-4 object-contain"
+          />
+        </div>
+        <div className="md:w-1/2 md:pl-6">
+          <h2 className="text-3xl font-bold mb-4 text-green-700">
+            {product.name}
+          </h2>
+          <p className="text-gray-700 mb-4">{product.description}</p>
+          <p className="text-green-600 font-bold text-2xl mb-4">
+            {formatCurrency(product.price)}
+          </p>
+          <p className="text-gray-600 mb-6">
+            <strong>Especificaciones:</strong> {product.specifications}
+          </p>
+          {product.price > 0 ? (
+            <button
+              onClick={() => addToCart(product)}
+              className="bg-green-600 text-white py-2 px-6 rounded hover:bg-green-700 transition flex items-center"
+            >
+              <FaShoppingCart className="mr-2" /> Agregar al Carrito
+            </button>
+          ) : (
+            <Link
+              to="/buy"
+              className="bg-blue-600 text-white py-2 px-6 rounded hover:bg-blue-700 transition flex items-center"
+            >
+              Contactar por Servicio
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default ProductDetails;
+
+// src/pages/Reports.jsx
+
+import React, { useEffect, useState } from "react";
+import axios from "axios";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+} from "recharts";
+
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
+
+function Reports() {
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchReports = async () => {
+    try {
+      const response = await axios.get("http://localhost:8000/api/reports");
+      setReports(response.data.reports);
+      setLoading(false);
+    } catch (err) {
+      console.error("Error fetching reports:", err);
+      setError(true);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  if (loading) {
+    return <div className="text-center mt-20">Cargando reportes...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="text-center mt-20 text-red-500">
+        Error al cargar los reportes.
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6 mt-20">
+      <h1 className="text-4xl font-bold mb-6 text-center text-green-700">
+        Reportes Inteligentes
+      </h1>
+
+      {reports.map((report, index) => (
+        <div key={index} className="mb-12">
+          <h2 className="text-2xl font-semibold mb-4 text-indigo-600">
+            {report.title}
+          </h2>
+          <p className="mb-4">{report.description}</p>
+          <div className="bg-white shadow rounded-lg p-6">
+            {/* Visualización basada en el título del reporte */}
+            {report.title === "Reporte de Productividad" ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={Object.keys(report.data).map((key) => ({
+                    name: key,
+                    Production: report.data[key],
+                  }))}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 20,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="Production" fill="#82ca9d" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : report.title === "Reporte de Seguridad" ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={Object.keys(report.data).map((key) => ({
+                      name: key,
+                      value: report.data[key],
+                    }))}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    fill="#8884d8"
+                    label
+                  >
+                    {Object.keys(report.data).map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : report.title === "Reporte Financiero" ? (
+              <div>
+                <div className="flex justify-around">
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold">Total Costos</h3>
+                    <p className="text-2xl text-red-500">
+                      ${report.data["Total Costos"].toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold">Total Ingresos</h3>
+                    <p className="text-2xl text-green-500">
+                      ${report.data["Total Ingresos"].toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="text-center">
+                    <h3 className="text-xl font-semibold">Beneficio Neto</h3>
+                    <p
+                      className={`text-2xl ${
+                        report.data["Beneficio Neto"] >= 0
+                          ? "text-green-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      ${report.data["Beneficio Neto"].toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : report.title === "Reporte de Recursos" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">
+                    Consumo de Agua
+                  </h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={Object.keys(report.data["Consumo de Agua"]).map(
+                          (key) => ({
+                            name: key,
+                            value: report.data["Consumo de Agua"][key],
+                          })
+                        )}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#82ca9d"
+                        label
+                      >
+                        {Object.keys(report.data["Consumo de Agua"]).map(
+                          (entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
+                          )
+                        )}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">
+                    Consumo de Alimentos
+                  </h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={Object.keys(
+                          report.data["Consumo de Alimentos"]
+                        ).map((key) => ({
+                          name: key,
+                          value: report.data["Consumo de Alimentos"][key],
+                        }))}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        label
+                      >
+                        {Object.keys(report.data["Consumo de Alimentos"]).map(
+                          (entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
+                          )
+                        )}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : report.title === "Reporte Predictivo" ? (
+              <div>
+                <h3 className="text-lg font-semibold mb-2">
+                  Predicciones de Salud
+                </h3>
+                <p className="mb-4">{report.data["Salud"]}</p>
+                <h3 className="text-lg font-semibold mb-2">
+                  Pronóstico de Productividad
+                </h3>
+                <p>{report.data["Productividad"]}</p>
+              </div>
+            ) : (
+              <pre>{JSON.stringify(report.data, null, 2)}</pre>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default Reports;
+
+// src/pages/Shop.jsx
+import React, { useContext } from "react";
+import { CartContext } from "../context/CartContext";
+import { Link } from "react-router-dom";
+import {
+  FaShippingFast,
+  FaTools,
+  FaCogs,
+  FaBolt,
+  FaLeaf,
+} from "react-icons/fa";
+
+function Shop() {
+  const { addToCart } = useContext(CartContext);
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("es-MX", {
+      style: "currency",
+      currency: "MXN",
+    }).format(amount);
+  };
+
+  const products = [
+    {
+      id: "kit1",
+      name: "Agrotrack Kit",
+      description: "Kit básico de monitoreo para tu ganado.",
+      price: 1999.99,
+      image: "/kit.png",
+      icon: <FaTools size={40} color="#4CAF50" />,
+      specifications:
+        "Incluye sensores básicos, monitoreo en tiempo real y soporte técnico estándar.",
+    },
+    {
+      id: "service1",
+      name: "Servicio de Consultoría",
+      description: "Contáctanos para servicios personalizados.",
+      price: 0,
+      image: "/service.png",
+      icon: <FaCogs size={40} color="#2196F3" />,
+      specifications:
+        "Consultoría personalizada para optimizar tus operaciones ganaderas.",
+    },
+    {
+      id: "kit2",
+      name: "Agrotrack Avanzado",
+      description: "Kit avanzado con funcionalidades adicionales.",
+      price: 2999.99,
+      image: "/kit-advanced.png",
+      icon: <FaTools size={40} color="#4CAF50" />,
+      specifications:
+        "Sensores avanzados, integración con software de análisis y soporte premium.",
+    },
+    {
+      id: "service2",
+      name: "Soporte Técnico Premium",
+      description: "Soporte técnico prioritario 24/7.",
+      price: 4999.99,
+      image: "/support.png",
+      icon: <FaShippingFast size={40} color="#FF5722" />,
+      specifications:
+        "Soporte técnico prioritario, actualizaciones regulares y consultoría continua.",
+    },
+    {
+      id: "kit3",
+      name: "Agrotrack Profesional",
+      description: "Kit profesional para grandes operaciones ganaderas.",
+      price: 4999.99,
+      image: "/kit-professional.png",
+      icon: <FaBolt size={40} color="#FFC107" />,
+      specifications:
+        "Sensores de alta precisión, múltiples integraciones y soporte dedicado.",
+    },
+    {
+      id: "service3",
+      name: "Mantenimiento Regular",
+      description: "Servicio de mantenimiento mensual.",
+      price: 1499.99,
+      image: "/maintenance.png",
+      icon: <FaLeaf size={40} color="#8BC34A" />,
+      specifications:
+        "Mantenimiento preventivo, revisión de sensores y optimización del sistema.",
+    },
+  ];
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6 text-center text-green-700">
+        Tienda
+      </h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        {products.map((product) => (
+          <div
+            key={product.id}
+            className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-6 flex flex-col items-center"
+          >
+            <div className="mb-4">{product.icon}</div>
+            <Link to={`/product/${product.id}`}>
+              <img
+                src={product.image}
+                alt={product.name}
+                className="h-40 w-auto mb-4 object-contain"
+              />
+            </Link>
+            <h2 className="text-xl font-semibold mb-2">{product.name}</h2>
+            <p className="text-gray-600 mb-4">{product.description}</p>
+            {product.price > 0 ? (
+              <div className="w-full">
+                <p className="text-green-600 font-bold text-lg mb-2">
+                  {formatCurrency(product.price)}
+                </p>
+                <button
+                  onClick={() => addToCart(product)}
+                  className="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 transition-colors duration-300"
+                >
+                  Agregar al Carrito
+                </button>
+              </div>
+            ) : (
+              <div className="w-full">
+                <Link
+                  to="/buy"
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 transition-colors duration-300 inline-block text-center"
+                >
+                  Contactar por Servicio
+                </Link>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default Shop;
+
+// src/pages/Signup.jsx
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { supabase } from "../client"; // Asegúrate de tener esta importación
+
+function Signup() {
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState(""); // Opcional si no usas autenticación
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
+    try {
+      // Insertar directamente en la tabla "ganaderos"
+      const { error: insertError } = await supabase
+        .from("ganaderos")
+        .insert([{ nombre, telefono, direccion, email }]); // Añade 'email' si es necesario
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      navigate("/home"); // Redirige a la página deseada después del registro
+    } catch (err) {
+      setError(err.message || "Error al registrar el ganadero");
+      console.error("Signup error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-green-400 to-green-700">
+      <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-md mx-4">
+        <div className="text-center mb-6">
+          <img
+            src="/logo.png"
+            alt="Agrotrack Logo"
+            className="h-20 w-auto mx-auto mb-4"
+          />
+          <h1 className="text-3xl font-bold text-gray-800">
+            Registrar Ganadero
+          </h1>
+        </div>
+        {error && (
+          <p className="text-red-600 mb-4 text-center font-semibold">{error}</p>
+        )}
+        <form onSubmit={handleSignup} className="space-y-4">
+          <div>
+            <label className="block text-gray-700 font-semibold mb-1">
+              Nombre Completo
+            </label>
+            <input
+              type="text"
+              placeholder="Ingresa el nombre completo"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-gray-700 font-semibold mb-1">
+              Teléfono
+            </label>
+            <input
+              type="text"
+              placeholder="Ingresa el número de teléfono"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          <div>
+            <label className="block text-gray-700 font-semibold mb-1">
+              Dirección
+            </label>
+            <input
+              type="text"
+              placeholder="Ingresa la dirección"
+              value={direccion}
+              onChange={(e) => setDireccion(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+          {/* Opcional: Campos de Email y Contraseña si decides usarlos */}
+          <div>
+            <label className="block text-gray-700 font-semibold mb-1">
+              Correo Electrónico
+            </label>
+            <input
+              type="email"
+              placeholder="Ingresa el correo electrónico"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div>
+          {/* Campo de contraseña opcional */}
+          {/* <div>
+            <label className="block text-gray-700 font-semibold mb-1">
+              Contraseña
+            </label>
+            <input
+              type="password"
+              placeholder="Crea una contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              required
+            />
+          </div> */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-300"
+          >
+            {isLoading ? "Registrando..." : "Registrar Ganadero"}
+          </button>
+        </form>
+        <p className="mt-6 text-center text-gray-600">
+          ¿Ya tienes una cuenta?{" "}
+          <Link
+            to="/login"
+            className="text-green-600 font-semibold hover:underline"
+          >
+            Inicia Sesión aquí
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default Signup;
+
+// src/pages/Welcome.jsx
+
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const tabs = [
+  {
+    title: "¿Qué es Agrotrack?",
+    content:
+      "Agrotrack es una aplicación diseñada para gestionar y monitorear tu ganado de manera eficiente y sencilla.",
+  },
+  {
+    title: "Funciones Principales",
+    content:
+      "Registra tus vacas, monitorea su ubicación en tiempo real y utiliza inteligencia artificial para optimizar el manejo de tu ganado.",
+  },
+  {
+    title: "Cómo Empezar",
+    content:
+      "Regístrate o inicia sesión para comenzar a gestionar tu grupo de vacas y aprovechar todas las funcionalidades que Agrotrack ofrece.",
+  },
+];
+
+function Welcome() {
+  const [activeTab, setActiveTab] = useState(0);
+  const navigate = useNavigate();
+
+  const handleComencemos = () => {
+    navigate("/login");
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-400 to-blue-500 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-2xl w-full mx-auto">
+        <div className="text-center">
+          <img
+            src="/logo.png"
+            alt="Agrotrack Logo"
+            className="h-24 w-auto mx-auto mb-6"
+          />
+          <h1 className="text-4xl font-extrabold mb-6 text-gray-800">
+            Bienvenido a <span className="text-green-600">Agrotrack</span>
+          </h1>
+        </div>
+        <div className="flex flex-wrap justify-center mb-6">
+          {tabs.map((tab, index) => (
+            <button
+              key={index}
+              className={`m-2 px-4 py-2 rounded-full font-semibold transition duration-300 ${
+                activeTab === index
+                  ? "bg-green-600 text-white shadow-lg"
+                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              }`}
+              onClick={() => setActiveTab(index)}
+            >
+              {tab.title}
+            </button>
+          ))}
+        </div>
+        <div className="mb-8 text-center">
+          <p className="text-gray-700 text-lg">{tabs[activeTab].content}</p>
+        </div>
+        <button
+          onClick={handleComencemos}
+          className="w-full bg-green-600 text-white py-3 rounded-full font-semibold text-lg shadow-lg hover:bg-green-700 transition duration-300"
+        >
+          ¡Comencemos!
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default Welcome;
+

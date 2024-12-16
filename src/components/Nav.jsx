@@ -1,216 +1,151 @@
 // src/components/Nav.jsx
 
-import React, { useState, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
-import { AuthContext } from "../context/AuthContext";
+import React, { useContext, useState } from "react";
+import { Link } from "react-router-dom";
+import { CartContext } from "../context/CartContext";
+import { FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
 
 function Nav() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { ganadero, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
+  const { totalItems } = useContext(CartContext);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate("/welcome");
-    setIsMobileMenuOpen(false);
+  // Función para cerrar el menú al hacer clic en un enlace
+  const handleLinkClick = () => {
+    setIsMenuOpen(false);
   };
 
   return (
-    <nav className="bg-white shadow-md fixed w-full z-20">
-      <div className="container mx-auto flex items-center justify-between p-4">
+    <nav className="bg-green-700 text-white p-4 shadow-md fixed top-0 left-0 right-0 z-50">
+      <div className="container mx-auto flex justify-between items-center">
         {/* Logo */}
-        <Link to="/" className="flex items-center">
-          <img src="/logo.png" className="h-10 w-auto" />
-          <span className="ml-2 text-xl font-bold text-green-600">
-            Agrotrack
-          </span>
+        <Link to="/welcome" className="text-2xl font-bold">
+          Agrotrack
         </Link>
 
-        {/* Desktop Menu */}
-        <div className="hidden md:flex items-center space-x-6">
-          <Link
-            to="/welcome"
-            className="text-gray-700 hover:text-green-600 font-medium transition duration-300"
+        {/* Botón del Menú Hamburguesa - Visible en pantallas pequeñas */}
+        <div className="md:hidden">
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="focus:outline-none"
+            aria-label="Toggle Menu"
           >
-            ¿Qué es Agrotrack?
+            {isMenuOpen ? <FaTimes size={24} /> : <FaBars size={24} />}
+          </button>
+        </div>
+
+        {/* Enlaces de Navegación - Ocultos en pantallas pequeñas */}
+        <div className="hidden md:flex space-x-4">
+          <Link
+            to="/home"
+            className="hover:text-gray-200 transition duration-200"
+          >
+            Home
           </Link>
-          {ganadero && (
-            <>
-              <Link
-                to="/home"
-                className="text-gray-700 hover:text-green-600 font-medium transition duration-300"
-              >
-                Home
-              </Link>
-              <Link
-                to="/registrodevacas"
-                className="text-gray-700 hover:text-green-600 font-medium transition duration-300"
-              >
-                Registro
-              </Link>
-              <Link
-                to="/mapa"
-                className="text-gray-700 hover:text-green-600 font-medium transition duration-300"
-              >
-                Mapa
-              </Link>
-              <Link
-                to="/monitoreo"
-                className="text-gray-700 hover:text-green-600 font-medium transition duration-300"
-              >
-                Monitoreo
-              </Link>
-              <Link
-                to="/enfermedades"
-                className="text-gray-700 hover:text-green-600 font-medium transition duration-300"
-              >
-                Enfermedades
-              </Link>
-              <Link
-                to="/contact"
-                className="text-gray-700 hover:text-green-600 font-medium transition duration-300"
-              >
-                IA
-              </Link>
-            </>
-          )}
-        </div>
-
-        {/* Desktop Buttons */}
-        <div className="hidden md:flex items-center space-x-4">
-          {ganadero ? (
-            <>
-              <span className="text-gray-700 font-medium">
-                Hola, <span className="font-bold">{ganadero.nombre}</span>
+          <Link
+            to="/shop"
+            className="hover:text-gray-200 transition duration-200"
+          >
+            Tienda
+          </Link>
+          <Link
+            to="/faq"
+            className="hover:text-gray-200 transition duration-200"
+          >
+            FAQ
+          </Link>
+          <Link
+            to="/about"
+            className="hover:text-gray-200 transition duration-200"
+          >
+            Acerca de
+          </Link>
+          <Link
+            to="/contact"
+            className="hover:text-gray-200 transition duration-200"
+          >
+            Contacto
+          </Link>
+          <Link to="/cart" className="relative hover:text-gray-200">
+            <FaShoppingCart size={24} />
+            {totalItems > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-600 text-xs rounded-full px-1">
+                {totalItems}
               </span>
-              <button
-                onClick={handleLogout}
-                className="bg-red-500 text-white px-4 py-2 rounded-full font-medium hover:bg-red-600 transition duration-300"
-              >
-                Cerrar Sesión
-              </button>
-            </>
-          ) : (
-            <>
-              <Link
-                to="/login"
-                className="bg-green-600 text-white px-4 py-2 rounded-full font-medium hover:bg-green-700 transition duration-300"
-              >
-                Iniciar Sesión
-              </Link>
-              <Link
-                to="/signup"
-                className="border border-green-600 text-green-600 px-4 py-2 rounded-full font-medium hover:bg-green-600 hover:text-white transition duration-300"
-              >
-                Registrarse
-              </Link>
-            </>
-          )}
+            )}
+          </Link>
         </div>
-
-        {/* Mobile Menu Button */}
-        <button
-          onClick={toggleMobileMenu}
-          className="md:hidden text-gray-700 focus:outline-none"
-        >
-          {isMobileMenuOpen ? (
-            <XMarkIcon className="h-6 w-6" />
-          ) : (
-            <Bars3Icon className="h-6 w-6" />
-          )}
-        </button>
       </div>
 
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-white shadow-lg">
-          <nav className="px-4 pt-4 pb-6 space-y-4">
+      {/* Menú Desplegable Móvil */}
+      {/* Aplicamos clases para posicionarlo fijo, con fondo semitransparente y transición */}
+      <div
+        className={`md:hidden fixed top-0 left-0 w-full h-full bg-green-700 bg-opacity-95 text-white transform ${
+          isMenuOpen ? "translate-x-0" : "-translate-x-full"
+        } transition-transform duration-300 ease-in-out z-40`}
+      >
+        <ul className="flex flex-col items-center justify-center space-y-6 h-full">
+          <li>
             <Link
-              to="/welcome"
-              className="block text-gray-700 hover:text-green-600 font-medium transition duration-300"
-              onClick={toggleMobileMenu}
+              to="/home"
+              onClick={handleLinkClick}
+              className="text-2xl hover:text-gray-200 transition duration-200"
             >
-              ¿Qué es Agrotrack?
+              Home
             </Link>
-            {ganadero && (
-              <>
-                <Link
-                  to="/home"
-                  className="block text-gray-700 hover:text-green-600 font-medium transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  Home
-                </Link>
-                <Link
-                  to="/registrodevacas"
-                  className="block text-gray-700 hover:text-green-600 font-medium transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  Registro
-                </Link>
-                <Link
-                  to="/mapa"
-                  className="block text-gray-700 hover:text-green-600 font-medium transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  Mapa
-                </Link>
-                <Link
-                  to="/monitoreo"
-                  className="block text-gray-700 hover:text-green-600 font-medium transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  Monitoreo
-                </Link>
-                <Link
-                  to="/enfermedades"
-                  className="block text-gray-700 hover:text-green-600 font-medium transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  Enfermedades
-                </Link>
-                <Link
-                  to="/contact"
-                  className="block text-gray-700 hover:text-green-600 font-medium transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  IA
-                </Link>
-              </>
-            )}
-            {ganadero ? (
-              <button
-                onClick={handleLogout}
-                className="w-full text-left text-red-500 font-medium hover:text-red-600 transition duration-300"
-              >
-                Cerrar Sesión
-              </button>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="block bg-green-600 text-white px-4 py-2 rounded-full font-medium text-center hover:bg-green-700 transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  Iniciar Sesión
-                </Link>
-                <Link
-                  to="/signup"
-                  className="block border border-green-600 text-green-600 px-4 py-2 rounded-full font-medium text-center hover:bg-green-600 hover:text-white transition duration-300"
-                  onClick={toggleMobileMenu}
-                >
-                  Registrarse
-                </Link>
-              </>
-            )}
-          </nav>
-        </div>
-      )}
+          </li>
+          <li>
+            <Link
+              to="/shop"
+              onClick={handleLinkClick}
+              className="text-2xl hover:text-gray-200 transition duration-200"
+            >
+              Tienda
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/faq"
+              onClick={handleLinkClick}
+              className="text-2xl hover:text-gray-200 transition duration-200"
+            >
+              FAQ
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/about"
+              onClick={handleLinkClick}
+              className="text-2xl hover:text-gray-200 transition duration-200"
+            >
+              Acerca de
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/contact"
+              onClick={handleLinkClick}
+              className="text-2xl hover:text-gray-200 transition duration-200"
+            >
+              Contacto
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/cart"
+              onClick={handleLinkClick}
+              className="relative text-2xl hover:text-gray-200 flex items-center"
+            >
+              <FaShoppingCart size={24} />
+              {totalItems > 0 && (
+                <span className="ml-2 bg-red-600 text-xs rounded-full px-1">
+                  {totalItems}
+                </span>
+              )}
+              <span className="ml-2">Carrito</span>
+            </Link>
+          </li>
+        </ul>
+      </div>
     </nav>
   );
 }

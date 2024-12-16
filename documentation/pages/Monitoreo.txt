@@ -1,40 +1,39 @@
 // src/pages/Monitoreo.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { supabase } from "../client";
+import { AuthContext } from "../context/AuthContext";
 import Tree from "react-d3-tree";
 
 function Monitoreo() {
+  const { ganadero } = useContext(AuthContext);
   const [animals, setAnimals] = useState([]);
   const [treeData, setTreeData] = useState(null);
   const [selectedAnimalId, setSelectedAnimalId] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  // Función para obtener todos los animales
+  // Función para obtener los animales
   const fetchAnimals = async () => {
-    setLoading(true);
-    setError("");
     try {
-      const { data, error } = await supabase.from("animals").select("*");
+      const { data, error } = await supabase
+        .from("animals")
+        .select("*")
+        .eq("ganadero_id", ganadero.id);
 
       if (error) {
         console.error("Error fetching animals:", error);
-        setError("Error al obtener los animales.");
       } else {
         setAnimals(data);
       }
     } catch (err) {
       console.error("Error fetching animals:", err);
-      setError("Error al obtener los animales.");
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAnimals();
-  }, []);
+    if (ganadero) {
+      fetchAnimals();
+    }
+  }, [ganadero]);
 
   // Función para generar datos del árbol genealógico
   const generateTreeDataForAnimal = (animalId) => {
@@ -136,45 +135,37 @@ function Monitoreo() {
             Datos del Ganado
           </h2>
           {/* Tabla con los datos de los animales */}
-          {loading ? (
-            <p className="text-center text-white">Cargando animales...</p>
-          ) : error ? (
-            <p className="text-center text-red-600">{error}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white rounded-lg shadow-lg overflow-hidden">
-                <thead className="bg-green-600 text-white">
-                  <tr>
-                    <th className="py-3 px-4 text-left">Nombre</th>
-                    <th className="py-3 px-4 text-left">Especie</th>
-                    <th className="py-3 px-4 text-left">Raza</th>
-                    <th className="py-3 px-4 text-left">Edad</th>
-                    <th className="py-3 px-4 text-left">Peso (kg)</th>
-                    <th className="py-3 px-4 text-left">Grupo</th>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white rounded-lg shadow-lg overflow-hidden">
+              <thead className="bg-green-600 text-white">
+                <tr>
+                  <th className="py-3 px-4 text-left">Nombre</th>
+                  <th className="py-3 px-4 text-left">Especie</th>
+                  <th className="py-3 px-4 text-left">Raza</th>
+                  <th className="py-3 px-4 text-left">Edad</th>
+                  <th className="py-3 px-4 text-left">Peso (kg)</th>
+                  <th className="py-3 px-4 text-left">Grupo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {animals.map((animal, index) => (
+                  <tr
+                    key={animal.id}
+                    className={`${
+                      index % 2 === 0 ? "bg-gray-50" : "bg-white"
+                    } hover:bg-gray-100`}
+                  >
+                    <td className="py-3 px-4">{animal.name}</td>
+                    <td className="py-3 px-4">{animal.species}</td>
+                    <td className="py-3 px-4">{animal.breed || "N/A"}</td>
+                    <td className="py-3 px-4">{animal.age || "N/A"}</td>
+                    <td className="py-3 px-4">{animal.weight || "N/A"}</td>
+                    <td className="py-3 px-4">{animal.group_name || "N/A"}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {animals.map((animal, index) => (
-                    <tr
-                      key={animal.id}
-                      className={`${
-                        index % 2 === 0 ? "bg-gray-50" : "bg-white"
-                      } hover:bg-gray-100`}
-                    >
-                      <td className="py-3 px-4">{animal.name}</td>
-                      <td className="py-3 px-4">{animal.species}</td>
-                      <td className="py-3 px-4">{animal.breed || "N/A"}</td>
-                      <td className="py-3 px-4">{animal.age || "N/A"}</td>
-                      <td className="py-3 px-4">{animal.weight || "N/A"}</td>
-                      <td className="py-3 px-4">
-                        {animal.group_name || "N/A"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Árbol Genealógico */}

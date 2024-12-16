@@ -1,0 +1,47 @@
+// src/components/Nav.jsx
+import React, { useContext } from "react";
+import { Link } from "react-router-dom";
+import { CartContext } from "../context/CartContext";
+import { FaShoppingCart } from "react-icons/fa";
+
+function Nav() {
+  const { totalItems } = useContext(CartContext);
+
+  return (
+    <nav className="bg-green-700 text-white p-4 shadow-md">
+      <div className="container mx-auto flex justify-between items-center">
+        <Link to="/welcome" className="text-2xl font-bold">
+          Agrotrack
+        </Link>
+        <div className="flex space-x-4">
+          <Link to="/home" className="hover:text-gray-200">
+            Home
+          </Link>
+          <Link to="/shop" className="hover:text-gray-200">
+            Tienda
+          </Link>
+          <Link to="/faq" className="hover:text-gray-200">
+            FAQ
+          </Link>{" "}
+          {/* Enlace a la página de FAQ */}
+          <Link to="/about" className="hover:text-gray-200">
+            Acerca de
+          </Link>
+          <Link to="/contact" className="hover:text-gray-200">
+            Contacto
+          </Link>
+          <Link to="/cart" className="relative hover:text-gray-200">
+            <FaShoppingCart size={24} />
+            {totalItems > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-600 text-xs rounded-full px-1">
+                {totalItems}
+              </span>
+            )}
+          </Link>
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+export default Nav;

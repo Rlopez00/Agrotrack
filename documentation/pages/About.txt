@@ -29,6 +29,7 @@ function About() {
     const { data, error } = await supabase
       .from("animals")
       .select("*")
+      .eq("ganadero_id", ganadero_id)
       .order("created_at", { ascending: false });
 
     if (error) {
